@@ -28,5 +28,13 @@
 *.out
 *.app
 
+# CodeBlocks files
+*.cbp
+*.layout
+
+# CMake
+*.CMakeCache.txt
+CmakeFiles/*
+
 # Directories
 bin/*
