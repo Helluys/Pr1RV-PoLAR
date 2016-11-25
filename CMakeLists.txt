@@ -242,6 +242,8 @@ set(SRCS
   src/OpenCVMatcher.cpp
   src/LiveARApp.h
   src/LiveARApp.cpp
+  src/LiveARViewer.h
+  src/LiveARViewer.cpp
 )
 
 
