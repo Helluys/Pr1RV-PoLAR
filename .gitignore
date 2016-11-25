@@ -33,8 +33,11 @@
 *.layout
 
 # CMake
-*.CMakeCache.txt
-CmakeFiles/*
+CMakeCache.txt
+CMakeFiles/*
+*_automoc.cpp
+Makefile
+cmake_install.cmake
 
 # Directories
 bin/*
