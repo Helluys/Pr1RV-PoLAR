@@ -1,48 +1,37 @@
 #ifndef LIVEARAPP_H
 #define LIVEARAPP_H
 
-#include <stdexcept>
-
 #include <QtWidgets/QApplication>
 
 #include <PoLAR/VideoPlayer.h>
 #include <PoLAR/Image.h>
+#include <PoLAR/FrameAxis.h>
 
 #include "LiveARViewer.h"
-
-class LiveARException : public std::runtime_error
-{
-    public:
-        enum Type
-        {
-            UNKNOWN,
-            INVALID_CAMERA
-        } type;
-
-        LiveARException(const std::string &what = "", Type t = UNKNOWN) : std::runtime_error(what.c_str()), type(t)
-        {}
-};
-
+#include "LiveARTracker.h"
 
 class LiveARApp
 {
     public:
 
-        LiveARApp(unsigned width, unsigned height, int argc, char **argv, unsigned camera = 0);
+        LiveARApp(unsigned width, unsigned height, int &argc, char **argv, unsigned camera = 0);
         ~LiveARApp();
 
-        int go();
+        int exec();
 
-        void setCamera(unsigned camera) {mCameraID = camera;}
+        void loadObject(const std::string &filename);
 
     protected:
         QApplication mApp;
 
         LiveARViewer mViewer;
+        LiveARTracker mTracker;
 
+        int mCameraID;
         osg::ref_ptr<PoLAR::VideoPlayer> mCamera;
-        unsigned mCameraID;
-        osg::ref_ptr<PoLAR::Image<unsigned char>> mImage;
+        osg::ref_ptr<PoLAR::Image_uc> mImage, mReferenceImage;
+
+        osg::ref_ptr<PoLAR::FrameAxis> mObject3D;
 
 };
 

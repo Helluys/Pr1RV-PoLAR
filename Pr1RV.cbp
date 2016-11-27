@@ -37,6 +37,9 @@
 		<Unit filename="src/LiveARApp.h">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
+		<Unit filename="src/LiveARException.h" />
+		<Unit filename="src/LiveARTracker.cpp" />
+		<Unit filename="src/LiveARTracker.h" />
 		<Unit filename="src/LiveARViewer.cpp" />
 		<Unit filename="src/LiveARViewer.h" />
 		<Unit filename="src/OpenCVMatcher.cpp">
