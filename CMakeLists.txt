@@ -238,15 +238,12 @@ set(LINK_LIBRARIES
 
 
 set(SRCS
-  src/OpenCVMatcher.h
-  src/OpenCVMatcher.cpp
   src/LiveARApp.h
   src/LiveARApp.cpp
   src/LiveARViewer.h
   src/LiveARViewer.cpp
   src/LiveARTracker.h
   src/LiveARTracker.cpp
-  src/LiveARException.h
 )
 
 

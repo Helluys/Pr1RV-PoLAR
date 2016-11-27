@@ -3,7 +3,7 @@
 
 int main(int argc, char **argv)
 {
-    LiveARApp app(800, 600, argc, argv);
+    LiveARApp app(1024, 768, argc, argv);
 
     return app.exec();
 }

@@ -31,7 +31,7 @@ class LiveARApp
         osg::ref_ptr<PoLAR::VideoPlayer> mCamera;
         osg::ref_ptr<PoLAR::Image_uc> mImage, mReferenceImage;
 
-        osg::ref_ptr<PoLAR::FrameAxis> mObject3D;
+        osg::ref_ptr<PoLAR::Object3D> mObject3D;
 
 };
 

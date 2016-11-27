@@ -9,6 +9,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 
 #include "LiveARViewer.h"
 
@@ -18,19 +20,18 @@ class LiveARTracker : public QObject
 
     public:
         LiveARTracker(LiveARViewer &viewer, int min_hessian = 800, float threshold = 0.1);
-        LiveARTracker(LiveARViewer &viewer, const PoLAR::Image_uc &referenceImage, int min_hessian = 800, float threshold = 0.1);
+        LiveARTracker(LiveARViewer &viewer, PoLAR::Image_uc &referenceImage, int min_hessian = 800, float threshold = 0.1);
         ~LiveARTracker();
 
-        void setReferenceImage(const PoLAR::Image_uc &referenceImage);
+        void setReferenceImage(PoLAR::Image_uc &referenceImage);
 
     public slots:
-        void newFrameReceived(unsigned char* data, int w, int h, int d);
+        void newFrameReceived(unsigned char *data, int w, int h, int d);
 
     protected:
         cv::Mat computeHomography(cv::Mat &frame);
 
-        cv::Mat polarToCvImage(const PoLAR::Image_uc &polarImage) const;
-        PoLAR::Image_uc cvToPolarImage(const cv::Mat &cvImage) const;
+        cv::Mat polarToCvImage(PoLAR::Image_uc &polarImage) const;
 
         LiveARViewer &mViewer;
         cv::Mat mReferenceImage;

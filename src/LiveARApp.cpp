@@ -26,13 +26,13 @@ int LiveARApp::exec()
     mViewer.setBgImage(mImage.get());
 
     mCamera->play();
+
+    loadObject("armchair.obj");
+    mViewer.addObject3D(mObject3D.get());
+
     mViewer.center();
-
-    mObject3D = new PoLAR::FrameAxis;
-    osg::Group *scene = mViewer.getScene3D();
-    scene->addChild(mObject3D.get());
-
     mViewer.show();
+
     mApp.connect(&mApp, SIGNAL(lastWindowClosed()), &mApp, SLOT(quit()));
     QObject::connect(mCamera, SIGNAL(newFrame(unsigned char*,int,int,int)),
                         &mTracker, SLOT(newFrameReceived(unsigned char*,int,int,int)));
@@ -42,5 +42,7 @@ int LiveARApp::exec()
 
 void LiveARApp::loadObject(const std::string &filename)
 {
-    mObject3D = new PoLAR::FrameAxis;
+    mObject3D = new PoLAR::Object3D(filename);
+    mObject3D->setName("object");
+    mObject3D->optimize();
 }
