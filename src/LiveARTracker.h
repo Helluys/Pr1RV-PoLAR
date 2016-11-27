@@ -12,28 +12,28 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
-#include "LiveARViewer.h"
-
 class LiveARTracker : public QObject
 {
     Q_OBJECT
 
     public:
-        LiveARTracker(LiveARViewer &viewer, int min_hessian = 800, float threshold = 0.1);
-        LiveARTracker(LiveARViewer &viewer, PoLAR::Image_uc &referenceImage, int min_hessian = 800, float threshold = 0.1);
+        LiveARTracker(osg::ref_ptr<PoLAR::Object3D> trackedObject, int min_hessian = 1500, float threshold = 0.1);
+        LiveARTracker(osg::ref_ptr<PoLAR::Object3D> trackedObject, PoLAR::Image_uc &referenceImage, int min_hessian = 1500, float threshold = 0.1);
         ~LiveARTracker();
 
         void setReferenceImage(PoLAR::Image_uc &referenceImage);
+        void setTrackedObject(osg::ref_ptr<PoLAR::Object3D> trackedObject) {mTrackedObject = trackedObject;}
 
     public slots:
         void newFrameReceived(unsigned char *data, int w, int h, int d);
 
     protected:
-        cv::Mat computeHomography(cv::Mat &frame);
+        std::pair<cv::Mat, cv::Mat> computePose(cv::Mat &frame);
 
         cv::Mat polarToCvImage(PoLAR::Image_uc &polarImage) const;
+        osg::Vec3f cvToOsgVec3f(cv::Mat &mat) const;
 
-        LiveARViewer &mViewer;
+        osg::ref_ptr<PoLAR::Object3D> mTrackedObject;
         cv::Mat mReferenceImage;
         cv::SurfFeatureDetector mDetector;
         std::vector<cv::KeyPoint> mKpReference;
@@ -41,6 +41,9 @@ class LiveARTracker : public QObject
         cv::Mat mDescReference;
         cv::FlannBasedMatcher mMatcher;
         float mDistanceThreshold;
+
+        std::vector<cv::Point2f> mReferencePoints;
+        cv::Mat mCameraIntrisics;
 };
 
 #endif // LIVEARTRACKER_H

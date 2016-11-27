@@ -1,6 +1,6 @@
 #include "LiveARApp.h"
 
-LiveARApp::LiveARApp(unsigned width, unsigned height, int &argc, char **argv, unsigned camera) : mApp(argc, argv), mViewer(width, height), mTracker(mViewer), mCameraID(camera)
+LiveARApp::LiveARApp(unsigned width, unsigned height, int &argc, char **argv, unsigned camera) : mApp(argc, argv), mViewer(width, height), mTracker(nullptr), mCameraID(camera)
 {
     mReferenceImage = new PoLAR::Image_uc("reference.png", true);
     mTracker.setReferenceImage(*mReferenceImage.get());
@@ -29,6 +29,7 @@ int LiveARApp::exec()
 
     loadObject("armchair.obj");
     mViewer.addObject3D(mObject3D.get());
+    mTracker.setTrackedObject(mObject3D);
 
     mViewer.center();
     mViewer.show();
@@ -42,7 +43,7 @@ int LiveARApp::exec()
 
 void LiveARApp::loadObject(const std::string &filename)
 {
-    mObject3D = new PoLAR::Object3D(filename);
+    mObject3D = new PoLAR::Object3D(filename, false, true);
     mObject3D->setName("object");
     mObject3D->optimize();
 }
