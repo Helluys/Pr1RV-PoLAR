@@ -1,46 +1,44 @@
 #include "LiveARTracker.h"
 
-LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> trackedObject, int min_hessian, float threshold)
- : mTrackedObject(trackedObject), mDetector(min_hessian), mDistanceThreshold(threshold)
+LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> augmentedObject)
+ : mAugmentedObject(augmentedObject), mThread()
 {
-    mCameraIntrisics = cv::Mat::zeros(3, 3, CV_64FC1);
-    double f = 55;                           // focal length in mm
-    double sx = 22.3, sy = 14.9;             // sensor size
-    double width = 1024, height = 768;        // image size
-    mCameraIntrisics.at<double>(0, 0) = width*f/sx;     //      [ fx   0  cx ]
-    mCameraIntrisics.at<double>(1, 1) = height*f/sy;    //      [  0  fy  cy ]
-    mCameraIntrisics.at<double>(0, 2) = width/2;        //      [  0   0   1 ]
-    mCameraIntrisics.at<double>(1, 2) = height/2;
-    mCameraIntrisics.at<double>(2, 2) = 1;
+    QObject::connect(&mThread, SIGNAL(finished()), this, SLOT(updateObject()));
+    if(mAugmentedObject)
+        mAugmentedObject->setDisplayOff();
 }
 
-LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> trackedObject, PoLAR::Image_uc &referenceImage, int min_hessian, float threshold)
- : mTrackedObject(trackedObject), mReferenceImage(polarToCvImage(referenceImage)), mDetector(min_hessian), mDistanceThreshold(threshold)
+LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> augmentedObject, PoLAR::Image_uc &referenceImage)
+ : mAugmentedObject(augmentedObject), mThread(referenceImage)
 {
-    mDetector.detect(mReferenceImage, mKpReference);
-    mExtractor.compute(mReferenceImage, mKpReference, mDescReference);
-    mReferencePoints.push_back(cv::Point2f(0, 0));
-    mReferencePoints.push_back(cv::Point2f(mReferenceImage.cols, 0));
-    mReferencePoints.push_back(cv::Point2f(0, mReferenceImage.rows));
-    mReferencePoints.push_back(cv::Point2f(mReferenceImage.cols, mReferenceImage.rows));
+    QObject::connect(&mThread, SIGNAL(finished()), this, SLOT(updateObject()));
+    if(mAugmentedObject)
+        mAugmentedObject->setDisplayOff();
 }
 
 LiveARTracker::~LiveARTracker()
 {
-    //dtor
+    mThread.quit();
+    mThread.wait();
 }
 
 void LiveARTracker::setReferenceImage(PoLAR::Image_uc &referenceImage)
 {
-    mReferenceImage = polarToCvImage(referenceImage);
-    mDetector.detect(mReferenceImage, mKpReference);
-    mExtractor.compute(mReferenceImage, mKpReference, mDescReference);
+    mThread.setReferenceImage(referenceImage);
 }
 
 void LiveARTracker::newFrameReceived(unsigned char *data, int w, int h, int d)
 {
-    if(!mTrackedObject)
+    if(!mAugmentedObject)
+    {
+        std::cout << "No object to display" << std::endl;
         return;
+    }
+    if(mThread.isRunning())
+    {
+        std::cout << "Thread still running" << std::endl;
+        return;
+    }
 
     // Deep copy the image not to delete the camera data pool
     unsigned char *dataCopy = new unsigned char [w*h*d];
@@ -53,12 +51,24 @@ void LiveARTracker::newFrameReceived(unsigned char *data, int w, int h, int d)
     cv::cvtColor(frame, frame, CV_BGR2RGB);
 
     // Look for homography
-    std::pair<cv::Mat, cv::Mat> Rt = computePose(frame);
-    delete[] dataCopy;      // image not needed anymore
-    if(Rt.first.empty())
+    mThread.setFrame(frame);
+    std::cout << "Starting thread... ";
+    mThread.start();
+}
+
+void LiveARTracker::setAugmentedObject(osg::ref_ptr<PoLAR::Object3D> augmentedObject)
+{
+    mAugmentedObject = augmentedObject;
+    if(mAugmentedObject)
+        mAugmentedObject->setDisplayOff();
+}
+void LiveARTracker::updateObject()
+{
+    const std::pair<cv::Mat, cv::Mat> &Rt = mThread.getPose();
+    if(Rt.first.empty()) // reference was not found in frame
     {
-        mTrackedObject->setDisplayOff();
-        return;             // reference was not found in frame
+        mAugmentedObject->setDisplayOff();
+        std::cout << "Empty pose..." << std::endl;
     }
     else
     {
@@ -70,77 +80,13 @@ void LiveARTracker::newFrameReceived(unsigned char *data, int w, int h, int d)
         M.translate(cvToOsgVec3f(Rt.second));
 
         // Apply the pose to the object
-        mTrackedObject->setDisplayOn();
-        mTrackedObject->setTransformationMatrix(M);
+        mAugmentedObject->setDisplayOn();
+        mAugmentedObject->setTransformationMatrix(M);
+        std::cout << "Got Pose !!!" << std::endl;
     }
 }
 
-std::pair<cv::Mat, cv::Mat> LiveARTracker::computePose(cv::Mat &frame)
-{
-    using namespace cv;
-
-    // Detect keypoints
-    std::vector<KeyPoint> kpFrame;
-    mDetector.detect(frame, kpFrame);
-    std::cout << "kpFrame : " << kpFrame.size() << '\t';
-
-    // Extract descriptors
-    Mat descFrame;
-    mExtractor.compute(frame, kpFrame, descFrame);
-
-    // Match frame descriptors with reference descriptors
-    std::vector<DMatch> matches, goodMatches;
-    mMatcher.match(mDescReference, descFrame, matches);
-    std::cout << "matches : " << matches.size() << '\t';
-
-    // Look for best match distance
-    double minDistance = 100;
-    for(int i = 0; i < mDescReference.rows; i++)
-        if(matches[i].distance < minDistance)
-            minDistance = matches[i].distance;
-    std::cout << "distance : " << minDistance << std::endl;
-
-    // Returning an empty Mat means the object was not found
-    if(minDistance > mDistanceThreshold)
-        return std::make_pair(Mat(), Mat());
-
-    // Take only good matches (those with a distance < 3*minDistance)
-    for(int i = 0; i < mDescReference.rows; i++)
-        if(matches[i].distance < 3*minDistance)
-            goodMatches.push_back(matches[i]);
-
-    // Cannot determine homography without at least 4 points
-    if(goodMatches.size() < 4)
-        return std::make_pair(Mat(), Mat());
-
-    // Generate matched point list from good matches
-    vector<Point3f> ptsObject;
-    vector<Point2f> ptsFrame;
-    for(unsigned int i = 0; i < goodMatches.size(); i++)
-    {
-        ptsObject.push_back(Point3f(mKpReference[goodMatches[i].queryIdx].pt.x, mKpReference[goodMatches[i].queryIdx].pt.y, 0.f));
-        ptsFrame.push_back(kpFrame[goodMatches[i].trainIdx].pt);
-    }
-
-    // Vector of distortion coefficients
-    Mat distCoeffs = Mat::zeros(4, 1, CV_64FC1);
-    // Output Rotation - Translation vectors
-    std::pair<Mat, Mat> Rt = std::make_pair(Mat::zeros(3, 1, CV_64FC1),  cv::Mat::zeros(3, 1, CV_64FC1));
-    // Solve pose
-    solvePnPRansac(ptsObject, ptsFrame, mCameraIntrisics, distCoeffs, Rt.first, Rt.second, false, 500, 2.0, 0.95);
-
-    return Rt;
-}
-
-cv::Mat LiveARTracker::polarToCvImage(PoLAR::Image_uc& polarImage) const
-{
-    cv::Mat cvImage(polarImage.t(), polarImage.s(), CV_8UC3, polarImage.getRowStepInBytes());
-    cvImage.data = (uchar*)polarImage.data();
-    cv::cvtColor(cvImage, cvImage, CV_BGR2RGB);
-    return cvImage;
-}
-
-osg::Vec3f LiveARTracker::cvToOsgVec3f(cv::Mat &mat) const
+osg::Vec3f LiveARTracker::cvToOsgVec3f(const cv::Mat &mat) const
 {
     osg::Vec3f vec;
     if(mat.rows == 3 && mat.cols == 1)
@@ -152,3 +98,114 @@ osg::Vec3f LiveARTracker::cvToOsgVec3f(cv::Mat &mat) const
     return vec;
 }
 
+LiveARTracker::TrackingThread::TrackingThread(int min_hessian, float threshold)
+ : mDetector(min_hessian), mDistanceThreshold(threshold)
+{
+    mCameraIntrisics = cv::Mat::zeros(3, 3, CV_64FC1);
+    double f = 55;                           // focal length in mm
+    double sx = 22.3, sy = 14.9;             // sensor size
+    double width = 1024, height = 768;        // image size
+    mCameraIntrisics.at<double>(0, 0) = width*f/sx;     //      [ fx   0  cx ]
+    mCameraIntrisics.at<double>(1, 1) = height*f/sy;    //      [  0  fy  cy ]
+    mCameraIntrisics.at<double>(0, 2) = width/2;        //      [  0   0   1 ]
+    mCameraIntrisics.at<double>(1, 2) = height/2;
+    mCameraIntrisics.at<double>(2, 2) = 1;
+    mPose = std::make_pair(cv::Mat::zeros(3, 1, CV_64FC1),  cv::Mat::zeros(3, 1, CV_64FC1));
+}
+
+LiveARTracker::TrackingThread::TrackingThread(PoLAR::Image_uc &referenceImage, int min_hessian, float threshold) : TrackingThread(min_hessian, threshold)
+{
+    setReferenceImage(referenceImage);
+}
+
+void LiveARTracker::TrackingThread::setReferenceImage(PoLAR::Image_uc &referenceImage)
+{
+    mImageMutex.lock();
+        mReferenceImage = polarToCvImage(referenceImage);
+        mDetector.detect(mReferenceImage, mKpReference);
+        mExtractor.compute(mReferenceImage, mKpReference, mDescReference);
+    mImageMutex.unlock();
+}
+
+void LiveARTracker::TrackingThread::setFrame(cv::Mat &frame)
+{
+    mFrameMutex.lock();
+        mFrame = frame;
+    mFrameMutex.unlock();
+}
+
+void LiveARTracker::TrackingThread::run()
+{
+    using namespace cv;
+    if(mReferenceImage.empty())
+    {   // output empty values to notify failure
+        mPose = std::make_pair(Mat(), Mat());
+        return;
+    }
+
+    mFrameMutex.lock();
+        // Detect keypoints
+        std::vector<KeyPoint> kpFrame;
+        mDetector.detect(mFrame, kpFrame);
+
+        // Extract descriptors
+        Mat descFrame;
+        mExtractor.compute(mFrame, kpFrame, descFrame);
+    mFrameMutex.unlock();
+
+    // Match frame descriptors with reference descriptors
+    std::vector<DMatch> matches, goodMatches;
+    mImageMutex.lock(); // protect the reference descriptors
+        mMatcher.match(mDescReference, descFrame, matches);
+
+        // Look for best match distance
+        double minDistance = 100;
+        for(int i = 0; i < mDescReference.rows; i++)
+            if(matches[i].distance < minDistance)
+                minDistance = matches[i].distance;
+
+    std::cout << "Distance : "<< minDistance << " ";
+    // Returning an empty Mat means the object was not found
+    if(minDistance > mDistanceThreshold)
+    {
+        mPose = std::make_pair(Mat(), Mat());
+        return;
+    }
+
+    // Take only good matches (those with a distance < 3*minDistance)
+    for(unsigned i = 0; i < matches.size(); i++)
+        if(matches[i].distance < 3*minDistance)
+            goodMatches.push_back(matches[i]);
+
+    // Cannot determine homography without at least 4 points
+    if(goodMatches.size() < 4)
+    {
+        mPose = std::make_pair(Mat(), Mat());
+        return;
+    }
+
+    // Generate matched point list from good matches
+    vector<Point3f> ptsObject;
+    vector<Point2f> ptsFrame;
+    for(unsigned int i = 0; i < goodMatches.size(); i++)
+    {
+        ptsObject.push_back(Point3f(mKpReference[goodMatches[i].queryIdx].pt.x, mKpReference[goodMatches[i].queryIdx].pt.y, 0.f));
+        ptsFrame.push_back(kpFrame[goodMatches[i].trainIdx].pt);
+    }
+    mImageMutex.unlock();
+
+    // Vector of distortion coefficients
+    Mat distCoeffs = Mat::zeros(4, 1, CV_64FC1);
+    // Solve pose
+    mPoseMutex.lock();
+        solvePnPRansac(ptsObject, ptsFrame, mCameraIntrisics, distCoeffs, mPose.first, mPose.second, false, 500, 2.0, 0.95);
+    mPoseMutex.unlock();
+}
+
+cv::Mat LiveARTracker::TrackingThread::polarToCvImage(PoLAR::Image_uc& polarImage) const
+{
+    cv::Mat cvImage(polarImage.t(), polarImage.s(), CV_8UC3, polarImage.getRowStepInBytes());
+    cvImage.data = (uchar*)polarImage.data();
+    cv::cvtColor(cvImage, cvImage, CV_BGR2RGB);
+    return cvImage;
+}

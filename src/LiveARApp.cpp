@@ -29,14 +29,15 @@ int LiveARApp::exec()
 
     loadObject("armchair.obj");
     mViewer.addObject3D(mObject3D.get());
-    mTracker.setTrackedObject(mObject3D);
+    mTracker.setAugmentedObject(mObject3D);
 
     mViewer.center();
     mViewer.show();
 
-    mApp.connect(&mApp, SIGNAL(lastWindowClosed()), &mApp, SLOT(quit()));
     QObject::connect(mCamera, SIGNAL(newFrame(unsigned char*,int,int,int)),
-                        &mTracker, SLOT(newFrameReceived(unsigned char*,int,int,int)));
+                     &mTracker, SLOT(newFrameReceived(unsigned char*,int,int,int)));
+
+    mApp.connect(&mApp, SIGNAL(lastWindowClosed()), &mApp, SLOT(quit()));
 
     return mApp.exec();
 }
