@@ -69,12 +69,6 @@
 		<Unit filename="src/LiveARTracker.h" />
 		<Unit filename="src/LiveARViewer.cpp" />
 		<Unit filename="src/LiveARViewer.h" />
-		<Unit filename="src/OpenCVMatcher.cpp">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="src/OpenCVMatcher.h">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
 		<Unit filename="src/main.cpp">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
