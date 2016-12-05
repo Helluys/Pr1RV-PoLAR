@@ -1,19 +1,17 @@
 #include "LiveARTracker.h"
 
-LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> augmentedObject)
- : mAugmentedObject(augmentedObject), mThread()
+LiveARTracker::LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject)
+ : mThread()
 {
     QObject::connect(&mThread, SIGNAL(finished()), this, SLOT(updateObject()));
-    if(mAugmentedObject)
-        mAugmentedObject->setDisplayOff();
+    setTransformedObject(transformedObject);
 }
 
-LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> augmentedObject, PoLAR::Image_uc &referenceImage)
- : mAugmentedObject(augmentedObject), mThread(referenceImage)
+LiveARTracker::LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject, PoLAR::Image_uc &referenceImage)
+ : mThread(referenceImage)
 {
     QObject::connect(&mThread, SIGNAL(finished()), this, SLOT(updateObject()));
-    if(mAugmentedObject)
-        mAugmentedObject->setDisplayOff();
+    setTransformedObject(transformedObject);
 }
 
 LiveARTracker::~LiveARTracker()
@@ -29,14 +27,14 @@ void LiveARTracker::setReferenceImage(PoLAR::Image_uc &referenceImage)
 
 void LiveARTracker::newFrameReceived(unsigned char *data, int w, int h, int d)
 {
-    if(!mAugmentedObject)
+    if(!mTransformedObject)
     {
-        std::cout << "No object to display" << std::endl;
+        //std::cout << "No object to display" << std::endl;
         return;
     }
     if(mThread.isRunning())
     {
-        std::cout << "Thread still running" << std::endl;
+        //std::cout << "Thread still running" << std::endl;
         return;
     }
 
@@ -52,48 +50,47 @@ void LiveARTracker::newFrameReceived(unsigned char *data, int w, int h, int d)
 
     // Look for homography
     mThread.setFrame(frame);
-    std::cout << "Starting thread... ";
+    //std::cout << "Starting thread... ";
     mThread.start();
 }
 
-void LiveARTracker::setAugmentedObject(osg::ref_ptr<PoLAR::Object3D> augmentedObject)
+void LiveARTracker::setTransformedObject(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject)
 {
-    mAugmentedObject = augmentedObject;
-    if(mAugmentedObject)
-        mAugmentedObject->setDisplayOff();
+    mTransformedObject = transformedObject;
+    //if(mTransformedObject)
+        //mTransformedObject->setDisplayOff();
 }
+
 void LiveARTracker::updateObject()
 {
     const std::pair<cv::Mat, cv::Mat> &Rt = mThread.getPose();
     if(Rt.first.empty()) // reference was not found in frame
     {
-        mAugmentedObject->setDisplayOff();
-        std::cout << "Empty pose..." << std::endl;
+        //mAugmentedObject->setDisplayOff();
+        //std::cout << "Empty pose..." << std::endl;
     }
     else
     {
         // Generate projection Matrix in osg format
-        osg::Matrixd M = osg::Matrixd::identity();
         float angle = cv::norm(Rt.first);
         Rt.first /= angle;
-        M.setRotate(osg::Quat(angle, cvToOsgVec3f(Rt.first)));
-        M.translate(cvToOsgVec3f(Rt.second));
+        mTransformedObject->setAttitude(osg::Quat(angle, cvToOsgVec3d(Rt.first)));
+        mTransformedObject->setPosition(cvToOsgVec3d(Rt.second));
 
         // Apply the pose to the object
-        mAugmentedObject->setDisplayOn();
-        mAugmentedObject->setTransformationMatrix(M);
-        std::cout << "Got Pose !!!" << std::endl;
+        //mAugmentedObject->setDisplayOn();
+        std::cout << "Got Pose !!!" /*<< std::endl << M */<< std::endl;
     }
 }
 
-osg::Vec3f LiveARTracker::cvToOsgVec3f(const cv::Mat &mat) const
+osg::Vec3d LiveARTracker::cvToOsgVec3d(const cv::Mat &mat) const
 {
-    osg::Vec3f vec;
+    osg::Vec3d vec;
     if(mat.rows == 3 && mat.cols == 1)
     {
-        vec.x() = mat.at<float>(0);
-        vec.y() = mat.at<float>(1);
-        vec.z() = mat.at<float>(2);
+        vec.x() = mat.at<double>(0);
+        vec.y() = mat.at<double>(1);
+        vec.z() = mat.at<double>(2);
     }
     return vec;
 }
@@ -164,11 +161,12 @@ void LiveARTracker::TrackingThread::run()
             if(matches[i].distance < minDistance)
                 minDistance = matches[i].distance;
 
-    std::cout << "Distance : "<< minDistance << " ";
+    //std::cout << "Distance : "<< minDistance << " ";
     // Returning an empty Mat means the object was not found
     if(minDistance > mDistanceThreshold)
     {
         mPose = std::make_pair(Mat(), Mat());
+        mImageMutex.unlock();
         return;
     }
 
@@ -181,6 +179,7 @@ void LiveARTracker::TrackingThread::run()
     if(goodMatches.size() < 4)
     {
         mPose = std::make_pair(Mat(), Mat());
+        mImageMutex.unlock();
         return;
     }
 

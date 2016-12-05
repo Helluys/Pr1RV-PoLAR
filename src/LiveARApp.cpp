@@ -1,9 +1,14 @@
 #include "LiveARApp.h"
 
+#include <PoLAR/FrameAxis.h>
+
 LiveARApp::LiveARApp(unsigned width, unsigned height, int &argc, char **argv, unsigned camera) : mApp(argc, argv), mViewer(width, height), mTracker(nullptr), mCameraID(camera)
 {
     mReferenceImage = new PoLAR::Image_uc("reference.png", true);
     mTracker.setReferenceImage(*mReferenceImage.get());
+
+    mObject = new osg::PositionAttitudeTransform();
+    mObject->addChild(new PoLAR::FrameAxis());
 }
 
 LiveARApp::~LiveARApp()
@@ -27,24 +32,15 @@ int LiveARApp::exec()
 
     mCamera->play();
 
-    loadObject("armchair.obj");
-    mViewer.addObject3D(mObject3D.get());
-    mTracker.setAugmentedObject(mObject3D);
+    mViewer.getSceneGraph()->getShadowedObjectsNode()->addChild(mObject);
+    mTracker.setTransformedObject(mObject);
 
     mViewer.center();
     mViewer.show();
-
     QObject::connect(mCamera, SIGNAL(newFrame(unsigned char*,int,int,int)),
                      &mTracker, SLOT(newFrameReceived(unsigned char*,int,int,int)));
 
     mApp.connect(&mApp, SIGNAL(lastWindowClosed()), &mApp, SLOT(quit()));
 
     return mApp.exec();
-}
-
-void LiveARApp::loadObject(const std::string &filename)
-{
-    mObject3D = new PoLAR::Object3D(filename, false, true);
-    mObject3D->setName("object");
-    mObject3D->optimize();
 }

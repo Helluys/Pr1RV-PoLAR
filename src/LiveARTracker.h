@@ -4,7 +4,8 @@
 #include <QObject>
 
 #include <PoLAR/Image.h>
-#include <PoLAR/Object3D.h>
+
+#include <osg/PositionAttitudeTransform>
 
 #include <QThread>
 #include <QMutex>
@@ -20,19 +21,19 @@ class LiveARTracker : public QObject
     Q_OBJECT
 
     public:
-        LiveARTracker(osg::ref_ptr<PoLAR::Object3D> augmentedObject);
-        LiveARTracker(osg::ref_ptr<PoLAR::Object3D> augmentedObject, PoLAR::Image_uc &referenceImage);
+        LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject);
+        LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject, PoLAR::Image_uc &referenceImage);
         ~LiveARTracker();
 
         void setReferenceImage(PoLAR::Image_uc &referenceImage);
-        void setAugmentedObject(osg::ref_ptr<PoLAR::Object3D> augmentedObject);
+        void setTransformedObject(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject);
 
     public slots:
         void newFrameReceived(unsigned char *data, int w, int h, int d);
         void updateObject();
 
     protected:
-        osg::Vec3f cvToOsgVec3f(const cv::Mat &mat) const;
+        osg::Vec3d cvToOsgVec3d(const cv::Mat &mat) const;
 
         class TrackingThread : public QThread
         {
@@ -63,7 +64,7 @@ class LiveARTracker : public QObject
                 std::pair<cv::Mat, cv::Mat> mPose;
         } mThread;
 
-        osg::ref_ptr<PoLAR::Object3D> mAugmentedObject;
+        osg::ref_ptr<osg::PositionAttitudeTransform> mTransformedObject;
 };
 
 #endif // LIVEARTRACKER_H
