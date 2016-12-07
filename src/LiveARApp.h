@@ -26,7 +26,7 @@ class LiveARApp
         LiveARTracker mTracker;
 
         int mCameraID;
-        osg::ref_ptr<osg::PositionAttitudeTransform> mObject;
+        osg::ref_ptr<PoLAR::Object3D> mObject;
         osg::ref_ptr<PoLAR::VideoPlayer> mCamera;
         osg::ref_ptr<PoLAR::Image_uc> mImage, mReferenceImage;
 

@@ -1,13 +1,13 @@
 #include "LiveARTracker.h"
 
-LiveARTracker::LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject)
+LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> transformedObject)
  : mThread()
 {
     QObject::connect(&mThread, SIGNAL(finished()), this, SLOT(updateObject()));
     setTransformedObject(transformedObject);
 }
 
-LiveARTracker::LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject, PoLAR::Image_uc &referenceImage)
+LiveARTracker::LiveARTracker(osg::ref_ptr<PoLAR::Object3D> transformedObject, PoLAR::Image_uc &referenceImage)
  : mThread(referenceImage)
 {
     QObject::connect(&mThread, SIGNAL(finished()), this, SLOT(updateObject()));
@@ -27,16 +27,8 @@ void LiveARTracker::setReferenceImage(PoLAR::Image_uc &referenceImage)
 
 void LiveARTracker::newFrameReceived(unsigned char *data, int w, int h, int d)
 {
-    if(!mTransformedObject)
-    {
-        //std::cout << "No object to display" << std::endl;
+    if(!mTransformedObject || mThread.isRunning())
         return;
-    }
-    if(mThread.isRunning())
-    {
-        //std::cout << "Thread still running" << std::endl;
-        return;
-    }
 
     // Deep copy the image not to delete the camera data pool
     unsigned char *dataCopy = new unsigned char [w*h*d];
@@ -48,17 +40,14 @@ void LiveARTracker::newFrameReceived(unsigned char *data, int w, int h, int d)
     frame.data = dataCopy;
     cv::cvtColor(frame, frame, CV_BGR2RGB);
 
-    // Look for homography
+    // Start the pose computation thread
     mThread.setFrame(frame);
-    //std::cout << "Starting thread... ";
     mThread.start();
 }
 
-void LiveARTracker::setTransformedObject(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject)
+void LiveARTracker::setTransformedObject(osg::ref_ptr<PoLAR::Object3D> transformedObject)
 {
     mTransformedObject = transformedObject;
-    //if(mTransformedObject)
-        //mTransformedObject->setDisplayOff();
 }
 
 void LiveARTracker::updateObject()
@@ -66,20 +55,24 @@ void LiveARTracker::updateObject()
     const std::pair<cv::Mat, cv::Mat> &Rt = mThread.getPose();
     if(Rt.first.empty()) // reference was not found in frame
     {
-        //mAugmentedObject->setDisplayOff();
-        //std::cout << "Empty pose..." << std::endl;
+        std::cout << "Empty pose..." << std::endl;
+        mTransformedObject->setDisplayOff();
     }
     else
     {
         // Generate projection Matrix in osg format
+        std::cout << "Got Pose !!!" /*<< std::endl << M */<< std::endl;
         float angle = cv::norm(Rt.first);
         Rt.first /= angle;
-        mTransformedObject->setAttitude(osg::Quat(angle, cvToOsgVec3d(Rt.first)));
-        mTransformedObject->setPosition(cvToOsgVec3d(Rt.second));
+        mTransformedObject->setTransformationMatrix(osg::Matrixd::identity());
+
+        // TODO : correctly compute the transform (conversion from OpenCV to OSG)
+
+        mTransformedObject->rotate(angle, Rt.first.at<double>(0), Rt.first.at<double>(1), Rt.first.at<double>(2));
+        mTransformedObject->translate(Rt.second.at<double>(0), Rt.second.at<double>(1), Rt.second.at<double>(2));
 
         // Apply the pose to the object
-        //mAugmentedObject->setDisplayOn();
-        std::cout << "Got Pose !!!" /*<< std::endl << M */<< std::endl;
+        mTransformedObject->setDisplayOn();
     }
 }
 
@@ -127,6 +120,7 @@ void LiveARTracker::TrackingThread::setReferenceImage(PoLAR::Image_uc &reference
 void LiveARTracker::TrackingThread::setFrame(cv::Mat &frame)
 {
     mFrameMutex.lock();
+        delete[] mFrame.data;
         mFrame = frame;
     mFrameMutex.unlock();
 }

@@ -4,8 +4,7 @@
 #include <QObject>
 
 #include <PoLAR/Image.h>
-
-#include <osg/PositionAttitudeTransform>
+#include <PoLAR/Object3D.h>
 
 #include <QThread>
 #include <QMutex>
@@ -21,12 +20,12 @@ class LiveARTracker : public QObject
     Q_OBJECT
 
     public:
-        LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject);
-        LiveARTracker(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject, PoLAR::Image_uc &referenceImage);
+        LiveARTracker(osg::ref_ptr<PoLAR::Object3D> transformedObject);
+        LiveARTracker(osg::ref_ptr<PoLAR::Object3D> transformedObject, PoLAR::Image_uc &referenceImage);
         ~LiveARTracker();
 
         void setReferenceImage(PoLAR::Image_uc &referenceImage);
-        void setTransformedObject(osg::ref_ptr<osg::PositionAttitudeTransform> transformedObject);
+        void setTransformedObject(osg::ref_ptr<PoLAR::Object3D> transformedObject);
 
     public slots:
         void newFrameReceived(unsigned char *data, int w, int h, int d);
@@ -64,7 +63,7 @@ class LiveARTracker : public QObject
                 std::pair<cv::Mat, cv::Mat> mPose;
         } mThread;
 
-        osg::ref_ptr<osg::PositionAttitudeTransform> mTransformedObject;
+        osg::ref_ptr<PoLAR::Object3D> mTransformedObject;
 };
 
 #endif // LIVEARTRACKER_H
