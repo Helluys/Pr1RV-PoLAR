@@ -9,7 +9,7 @@ class LiveARViewer : public PoLAR::Viewer
     Q_OBJECT
 
     public:
-        LiveARViewer(unsigned width, unsigned height);
+        LiveARViewer(unsigned width, unsigned height, const osg::Matrix3d &K, float zNear = 0.0001, float zFar = 5000);
         ~LiveARViewer();
 };
 

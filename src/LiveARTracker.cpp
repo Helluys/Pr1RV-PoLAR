@@ -56,7 +56,7 @@ void LiveARTracker::updateObject()
     if(Rt.first.empty()) // reference was not found in frame
     {
         std::cout << "Empty pose..." << std::endl;
-        mTransformedObject->setDisplayOff();
+        //mTransformedObject->setDisplayOff();
     }
     else
     {
@@ -67,12 +67,12 @@ void LiveARTracker::updateObject()
         mTransformedObject->setTransformationMatrix(osg::Matrixd::identity());
 
         // TODO : correctly compute the transform (conversion from OpenCV to OSG)
-
+/*
         mTransformedObject->rotate(angle, Rt.first.at<double>(0), Rt.first.at<double>(1), Rt.first.at<double>(2));
         mTransformedObject->translate(Rt.second.at<double>(0), Rt.second.at<double>(1), Rt.second.at<double>(2));
-
+*/
         // Apply the pose to the object
-        mTransformedObject->setDisplayOn();
+        //mTransformedObject->setDisplayOn();
     }
 }
 

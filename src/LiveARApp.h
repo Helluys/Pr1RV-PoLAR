@@ -20,6 +20,8 @@ class LiveARApp
         int exec();
 
     protected:
+        osg::Matrix3d getProjectionMatrix();
+
         QApplication mApp;
 
         LiveARViewer mViewer;

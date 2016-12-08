@@ -1,13 +1,14 @@
 #include "LiveARApp.h"
 
 #include <PoLAR/FrameAxis.h>
+#include <osg/io_utils>
 
-LiveARApp::LiveARApp(unsigned width, unsigned height, int &argc, char **argv, unsigned camera) : mApp(argc, argv), mViewer(width, height), mTracker(nullptr), mCameraID(camera)
+LiveARApp::LiveARApp(unsigned width, unsigned height, int &argc, char **argv, unsigned camera) : mApp(argc, argv), mViewer(width, height, getProjectionMatrix()), mTracker(nullptr), mCameraID(camera)
 {
     mReferenceImage = new PoLAR::Image_uc("reference.png", true);
     mTracker.setReferenceImage(*mReferenceImage.get());
 
-    mObject = new PoLAR::Object3D(new PoLAR::FrameAxis(), true, true, true);
+    mObject = new PoLAR::Object3D(new PoLAR::FrameAxis(), true, true, false);
 }
 
 LiveARApp::~LiveARApp()
@@ -37,10 +38,22 @@ int LiveARApp::exec()
     mViewer.center();
     mViewer.show();
 
-    QObject::connect(mCamera, SIGNAL(newFrame(unsigned char*,int,int,int)),
-                     &mTracker, SLOT(newFrameReceived(unsigned char*,int,int,int)));
+    //QObject::connect(mCamera, SIGNAL(newFrame(unsigned char*,int,int,int)),
+      //               &mTracker, SLOT(newFrameReceived(unsigned char*,int,int,int)));
 
     mApp.connect(&mApp, SIGNAL(lastWindowClosed()), &mApp, SLOT(quit()));
 
     return mApp.exec();
+}
+
+osg::Matrix3d LiveARApp::getProjectionMatrix()
+{
+    double f = 55;                           // focal length in mm
+    double sx = 22.3, sy = 14.9;             // sensor size
+    double width = 1024, height = 768;        // image size
+
+    osg::Matrix3d P(width*f/sx,           0,  width/2,
+                             0, height*f/sy, height/2,
+                             0,           0,        1);
+    return P;
 }
