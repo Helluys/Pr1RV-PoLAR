@@ -61,15 +61,16 @@ void LiveARTracker::updateObject()
     else
     {
         // Generate projection Matrix in osg format
-        std::cout << "Got Pose !!!" /*<< std::endl << M */<< std::endl;
         float angle = cv::norm(Rt.first);
         Rt.first /= angle;
         mTransformedObject->setTransformationMatrix(osg::Matrixd::identity());
 
+        std::cout << "Got Pose : " << Rt.first << std::endl
+                  << Rt.second << std::endl;
         // TODO : correctly compute the transform (conversion from OpenCV to OSG)
 
         mTransformedObject->rotate(angle, Rt.first.at<double>(0), Rt.first.at<double>(1), Rt.first.at<double>(2));
-        mTransformedObject->translate(Rt.second.at<double>(0), Rt.second.at<double>(1), Rt.second.at<double>(2));
+        //mTransformedObject->translate(Rt.second.at<double>(0), Rt.second.at<double>(1), Rt.second.at<double>(2));
 
         // Apply the pose to the object
         mTransformedObject->setDisplayOn();
